@@ -1,0 +1,6 @@
+bin/
+obj/
+data/
+Credentials.fs
+.fake
+.DS_Store

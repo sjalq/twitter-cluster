@@ -1,0 +1,32 @@
+{
+    "_embedded" : [
+       {
+          "user_id" : "3612866536",
+          "social_authority" : 52.48,
+          "screen_name" : "SchalkDormehl",
+          "_links" : {
+             "self" : {
+                "href" : "/?user_id=3612866536"
+             }
+          }
+       }
+    ],
+    "_links" : {
+       "self" : {
+          "href" : "/social-authority?screen_name=schalkdormehl;AccessID=member-NGJkZGY4YTEtZTk4YS01ODA1LTg3NWYtMzJkYTJlZDkzYmY4;Timestamp=1653493280;Signature=8roJgXgSeDYQnYBxshVXhnvhhFQ="
+       },
+       "search" : [
+          {
+             "templated" : "yes",
+             "name" : "screen_name",
+             "href" : "/social-authority{?screen_name}"
+          },
+          {
+             "templated" : "yes",
+             "name" : "user_id",
+             "href" : "/social-authority{?user_id}"
+          }
+       ]
+    }
+ }
+ 
