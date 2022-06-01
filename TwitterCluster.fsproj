@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="ExtraMap.fs" />
+    <Compile Include="Types.fs" />
     <Compile Include="Delay.fs" />
     <Compile Include="Credentials.fs" />
     <Compile Include="Twitter.fs" />

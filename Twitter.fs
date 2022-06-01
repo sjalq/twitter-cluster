@@ -13,22 +13,7 @@ open FSharp.Core
 open System.Text
 
 open Delay
-
-type User =
-    {
-        Id : string
-        Username : string
-        DisplayName : string
-        Bio : string
-        FollowerCount : int
-        FollowingCount : int
-    }
-
-type RelevantFollowingUser =
-    {
-        User : User
-        FollowersWithinQuerySet : int
-    }
+open Types
 
 let getAccounts (twitterCtx:TwitterContext) usernames = 
     let getAccounts usernames =
@@ -47,17 +32,15 @@ let getAccounts (twitterCtx:TwitterContext) usernames =
     |> Array.fold (fun acc i -> acc |> Array.append i) [||]
 
 
-//type TwitterResult = Result<TwitterContext, Exception>
-
 let mutable lastTimeCalled = None
-let queryFollowingCallRateLimited (twitterCtx:TwitterContext) paginationToken userId =
+let queryFollowingCallRateLimited (twitterCtx:TwitterContext) paginationToken (userId:UserId) =
     lastTimeCalled <- delay 60000 lastTimeCalled
     let qry = 
         twitterCtx.TwitterUser
             .Where(fun user -> 
                 user.Type = UserType.Following
                 && user.UserFields = UserField.AllFields
-                && user.ID = userId
+                && user.ID = string userId
                 && user.MaxResults = 1000)
 
     try 
@@ -74,8 +57,11 @@ let queryFollowingCallRateLimited (twitterCtx:TwitterContext) paginationToken us
 //     let 
 
 let rec getAccountFollowing (twitterCtx:TwitterContext) paginationToken userId = 
-    let result = 
-        queryFollowingCallRateLimited twitterCtx paginationToken userId
+    let result =
+        queryFollowingCallRateLimited 
+            twitterCtx 
+            paginationToken 
+            userId
 
     let users = 
         match result with
@@ -86,7 +72,7 @@ let rec getAccountFollowing (twitterCtx:TwitterContext) paginationToken userId =
                         qry.Users.ToArray()
                         |> Array.map (fun u -> 
                         {
-                            Id = u.ID
+                            Id = u.ID.ToString()
                             Username = u.Username
                             DisplayName = u.Name
                             Bio = u.Description
@@ -127,7 +113,7 @@ let getAccountFollowingCached (twitterCtx:TwitterContext) paginationToken userId
         match fetchedFollowing with
         | Ok following -> 
             globalUserCache <- Map.add userId following globalUserCache
-            File.WriteAllText("data/globalUserCache.json",globalUserCache |> Json.serialize)
+            File.WriteAllText("data/globalUserCache.json", globalUserCache |> Json.serialize)
             Some following 
         | Error msg -> None
 
@@ -149,7 +135,20 @@ let getMultipleFollowingsCached (twitterCtx:TwitterContext) initialAccountUserna
         | Some following -> acc |> Array.append following
         | None -> acc
         ) [||] 
-    |> Array.groupBy (fun i -> i.Id)
-    |> Array.map (fun (g,a) -> g, { User = a.[0]; FollowersWithinQuerySet = a.Length })
-    // |> Array.sortByDescending (fun (_,v) -> v.FollowersWithinQuerySet)
+    |> Array.groupBy (fun u -> u.Id)
+    |> Array.map 
+        (fun (g,a) -> 
+            g, 
+            { UserId = a.[0].Id
+            ; Username = a.[0].Username
+            ; DisplayName = a.[0].DisplayName
+            ; Bio = a.[0].Bio
+            ; FollowerCount = a.[0].FollowerCount
+            ; FollowingCount = a.[0].FollowingCount
+            ; FollowersFromQuery = a.Length
+            ; SocialAuthority = 0M
+            })
+
+    // next line replaces the userid with the username for ease of use later.
+    |> Array.map (fun (_, record) -> record.Username, record) 
     |> Map.ofArray

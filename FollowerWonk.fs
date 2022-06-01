@@ -10,16 +10,13 @@ open System.Security.Cryptography
 open System.Text
 open System.IO
 
+open ExtraMap
+
+open Types
+
 [<Literal>]
 let followerWonkSample = "./followerWonkSample.json"
 type FollowerWonkData = JsonProvider<followerWonkSample>
-
-type FollowerWonkItem = 
-    {
-        Id : string
-        Username : string
-        SocialAuthority : decimal
-    }
 
 let hash_hmac (key:String) (message:String) = 
     let hmac = new HMACSHA1(Encoding.UTF8.GetBytes(key))
@@ -36,17 +33,14 @@ let authString accessId secretKey unixTimeValidUntil =
  
 let mutable globalSocialAuthCache = Map.empty
 
-let findKeysNotInMap keys table =
-    keys |> Array.filter (fun key -> table |> Map.containsKey key |> not)
-
-let addMultiple kvp table =
-    kvp 
-    |> Array.fold 
-        (fun state (key, value) -> state |> Map.add key value) 
-        table
-
 let findUsersNotInCache usernames =
-    globalSocialAuthCache |> findKeysNotInMap usernames
+    let result = globalSocialAuthCache |> findKeysNotInMap usernames
+    result 
+    |> Set.ofSeq
+    |> Set.difference (usernames |> Set.ofSeq)
+    |> String.concat ","
+    |> printfn "Cache hits for '%A' " 
+    result
 
 let getSocialAuth usernames =
     let mutable lastTimeCalled = None 
@@ -84,15 +78,15 @@ let getSocialAuth usernames =
                     root.Embedded 
                     |> Array.map (
                         fun u -> 
-                            u.ScreenName, 
+                            u.ScreenName.ToLowerInvariant(), 
                             {
-                                Id = u.UserId.ToString() 
-                                Username = u.ScreenName 
+                                Id = u.UserId.ToString()
+                                Username = u.ScreenName.ToLowerInvariant()
                                 SocialAuthority = u.SocialAuthority
                             })
 
                 globalSocialAuthCache <- globalSocialAuthCache |> addMultiple results
-                File.WriteAllText("data/globalUserCache.json",globalSocialAuthCache |> Json.serialize)
+                File.WriteAllText("data/globalSocialAuthCache.json",globalSocialAuthCache |> Json.serialize)
 
                 globalSocialAuthCache 
                 |> Map.filter (fun key _ -> usernames |> Array.contains key)
@@ -100,11 +94,9 @@ let getSocialAuth usernames =
             | _ -> Map.empty
 
     usernames 
-    |> Array.take 2
-    |> Array.chunkBySize 25 
-    |> Array.map getSocialAuth 
-    |> Array.map Map.toArray
-    |> Array.concat
-    |> Map.ofArray
-
-
+    |> Seq.take 25
+    |> Seq.chunkBySize 25 
+    |> Seq.map getSocialAuth 
+    |> Seq.map Map.toSeq
+    |> Seq.concat
+    |> Map.ofSeq

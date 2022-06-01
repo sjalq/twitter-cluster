@@ -15,8 +15,15 @@ open TargetUsers
 open System.Linq
 open ExtraMap
 
+open System
+
+let writeResults results = 
+    let filename = String.Format("data/query {0}.json", DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss"))
+    File.WriteAllText(filename, results |> Json.serialize)
+
 [<EntryPoint>]
 let main argv =
+    (* *)
     let mutable auth = new SingleUserAuthorizer()
     auth.CredentialStore <- twitterCredentialStore
     let twitterCtx = new TwitterContext(auth)
@@ -24,49 +31,38 @@ let main argv =
     globalUserCache <- File.ReadAllText("data/globalUserCache.json") |> Json.deserialize
     globalSocialAuthCache <- File.ReadAllText("data/globalSocialAuthCache.json") |> Json.deserialize
 
-    let checks = getSocialAuth targetUsers
-
     let twitterResults = 
         TargetUsers.targetUsers
         |> getMultipleFollowingsCached twitterCtx
         |> Map.toArray
-        |> Array.sortBy (fun (_, a) -> a.FollowersWithinQuerySet)
-    let twitterResults = 
-        twitterResults 
-        |> Array.take (max 250 twitterResults.Length)
+        |> Array.sortBy (fun (_, a) -> a.FollowersFromQuery)
+        |> Array.truncate 250 
         |> Map.ofArray 
 
-    let socialAuthResults = 
+    let followerWonkResults =
         twitterResults.Keys.ToArray()
         |> getSocialAuth
+
+    let joinedResults =
+        twitterResults
+        |> innerJoin followerWonkResults
+        |> Map.map (fun _ (fw,u) -> { u with SocialAuthority = fw.SocialAuthority })
+        |> Map.toSeq
+        |> Seq.map 
+            (fun (k,v) -> 
+                {| Username = v.Username
+                ; DisplayName = v.DisplayName
+                ; FollowersFromQuery = v.FollowersFromQuery
+                ; FollowerCount = v.FollowerCount
+                ; FollowingCount = v.FollowingCount
+                ; Influence = v.SocialAuthority * (decimal v.FollowersFromQuery) / (decimal v.FollowerCount)
+                |})
+        |> Seq.sortByDescending (fun u -> u.Influence)
+
+    writeResults joinedResults
+
+    joinedResults
+    |> Seq.map (fun u -> u.Username, u.FollowersFromQuery, u.Influence)
+    |> printfn "%A" 
     
-    let joinedResults = 
-        innerJoin 
-            twitterResults 
-            socialAuthResults
-        
-    joinedResults 
-    |> Map.toArray
-    |> Array.sortByDescending (fun (userId,(a,b)) -> (decimal a.FollowersWithinQuerySet) * b.SocialAuthority / (decimal a.User.FollowerCount))
-    |> printfn "%A"
-
-    // joinedResults
-    //     |> Map.toArray 
-    //     |> Array.map (
-    //         fun (name, (a,s)) -> 
-    //             match a with
-    //             | Some q ->
-    //                 q.User.Username, 
-    //                 q.User.DisplayName, 
-    //                 q.FollowersWithinQuerySet, 
-    //                 q.User.FollowerCount,
-    //                 (float q.User.FollowerCount)**0.5 / (float q.FollowersWithinQuerySet),
-    //                 (float q.User.FollowingCount)**0.5 / (float q.FollowersWithinQuerySet),
-    //             | _ -> (name, "0", 0, 0, 0, 0)
-    //         )
-    //     |> Array.sortBy (fun (_,_,_,_,relativeInfluence,_) -> relativeInfluence)
-    //     |> printfn "%A"
-
-    File.WriteAllText("data/detailsChris.json", joinedResults |> Json.serialize)
-
     1

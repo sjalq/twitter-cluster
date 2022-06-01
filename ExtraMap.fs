@@ -35,3 +35,12 @@ let rightOuterJoin left right =
 
 let innerJoin left right =
     fullOuterJoin left right |> getInner
+
+let findKeysNotInMap keys table =
+    keys |> Seq.filter (fun key -> table |> Map.containsKey key |> not)
+
+let addMultiple kvp table =
+    kvp 
+    |> Seq.fold 
+        (fun state (key, value) -> state |> Map.add key value) 
+        table
