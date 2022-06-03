@@ -13,10 +13,12 @@ open System.IO
 open ExtraMap
 
 open Types
+open JsonFileProcessing
 
 [<Literal>]
 let followerWonkSample = "./followerWonkSample.json"
 type FollowerWonkData = JsonProvider<followerWonkSample>
+
 
 let hash_hmac (key:String) (message:String) = 
     let hmac = new HMACSHA1(Encoding.UTF8.GetBytes(key))
@@ -33,16 +35,28 @@ let authString accessId secretKey unixTimeValidUntil =
  
 let mutable globalSocialAuthCache = Map.empty
 
+let lower strings = 
+    strings |> Seq.map (fun (x: string) -> (x.ToLowerInvariant()))
+
 let findUsersNotInCache usernames =
-    let result = globalSocialAuthCache |> findKeysNotInMap usernames
-    result 
-    |> Set.ofSeq
-    |> Set.difference (usernames |> Set.ofSeq)
+    let lowercaseUsernames = lower usernames
+    let cacheMisses = globalSocialAuthCache |> findKeysNotInMap lowercaseUsernames
+
+    let cacheHits = 
+        cacheMisses 
+        |> Set.ofSeq
+        |> Set.difference (lowercaseUsernames |> Set.ofSeq)
+
+    cacheHits 
     |> String.concat ","
     |> printfn "Cache hits for '%A' " 
-    result
+
+    cacheMisses
+
 
 let getSocialAuth usernames =
+    let lowercaseUsernames = lower usernames
+
     let mutable lastTimeCalled = None 
     let getSocialAuth usernames =
         let delayPeriod = 200;
@@ -56,15 +70,16 @@ let getSocialAuth usernames =
                 followerWonkCredentialStore.secretKey 
                 unixTime
         let uri = "https://api.followerwonk.com/social-authority"
-        let usernamesString = 
-            usernames 
-            |> findUsersNotInCache 
-            |> String.concat ","
+        let usernamesString = usernames |> String.concat ","
+        printfn "Fetching : %A" usernamesString 
         let url = String.Format("{0}?screen_name={1};{2}", uri, usernamesString, auth)
-        
+        log url
+
         let httpResult = 
             try
-                Ok (Http.RequestString(url))
+                let result = (Http.RequestString(url))
+                "Success : " + result |> log
+                Ok result
             with
             | ex ->
                 printfn "%A" ex.Message 
@@ -86,17 +101,20 @@ let getSocialAuth usernames =
                             })
 
                 globalSocialAuthCache <- globalSocialAuthCache |> addMultiple results
-                File.WriteAllText("data/globalSocialAuthCache.json",globalSocialAuthCache |> Json.serialize)
+                globalSocialAuthCache |> serializeJsonFile "data/globalSocialAuthCache.json" 
+                
+                
+                //globalSocialAuthCache |> Map.filter (fun key _ -> usernames |> Array.contains key)
 
-                globalSocialAuthCache 
-                |> Map.filter (fun key _ -> usernames |> Array.contains key)
+            | _ -> 
+                () // Map.empty
 
-            | _ -> Map.empty
-
-    usernames 
-    |> Seq.take 25
+    lowercaseUsernames 
+    |> findUsersNotInCache
+    // |> Seq.take 25 // safety line for hardening the interaction with the API
     |> Seq.chunkBySize 25 
     |> Seq.map getSocialAuth 
-    |> Seq.map Map.toSeq
-    |> Seq.concat
-    |> Map.ofSeq
+    |> ignore
+
+    globalSocialAuthCache 
+    |> Map.filter (fun key _ -> lowercaseUsernames |> Seq.contains key)

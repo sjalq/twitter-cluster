@@ -1,6 +1,7 @@
 bin/
 obj/
-data/
+data/*
+log/*
 Credentials.fs
 .fake
 .DS_Store

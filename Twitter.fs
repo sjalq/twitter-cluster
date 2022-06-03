@@ -14,6 +14,7 @@ open System.Text
 
 open Delay
 open Types
+open JsonFileProcessing
 
 let getAccounts (twitterCtx:TwitterContext) usernames = 
     let getAccounts usernames =
@@ -83,7 +84,10 @@ let rec getAccountFollowing (twitterCtx:TwitterContext) paginationToken userId =
                     printfn "%A" usersResult.Length
                     usersResult |> Ok 
                 with
-                | ex -> Error ex.Message
+                | ex -> 
+                    match ex with
+                    | :? NullReferenceException -> Ok [||]
+                    | _ -> Error ex.Message
             if qry.PaginationToken = null then
                 users
             else
@@ -113,9 +117,11 @@ let getAccountFollowingCached (twitterCtx:TwitterContext) paginationToken userId
         match fetchedFollowing with
         | Ok following -> 
             globalUserCache <- Map.add userId following globalUserCache
-            File.WriteAllText("data/globalUserCache.json", globalUserCache |> Json.serialize)
+            globalUserCache |> serializeJsonFile "data/globalUserCache.json"
             Some following 
-        | Error msg -> None
+        | Error msg -> 
+            printfn "Error: %A" msg
+            None
 
     match globalUserCache |> (Map.tryFind userId) with
     | None -> 
