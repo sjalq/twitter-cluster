@@ -44,3 +44,36 @@ let addMultiple kvp table =
     |> Seq.fold 
         (fun state (key, value) -> state |> Map.add key value) 
         table
+
+type Direction =
+    | Ascending
+    | Descending
+
+let rank rankFn direction table =
+    let directionFn = 
+        match direction with
+        | Ascending -> Array.sortBy
+        | Descending -> Array.sortByDescending
+    
+    table 
+    |> Map.toArray
+    //|> Array.sortBy (fun (_,v) -> rankFn v)
+    |> directionFn (fun (_,v) -> rankFn v)
+    |> Array.mapi (fun i (key, _) -> (key, i))
+    |> Map.ofArray
+
+let rankMultiple rankFns table =
+    rankFns
+    |> Array.map (fun (rankFn, dir) ->  table |> rank rankFn dir |> Map.toArray)
+    |> Array.transpose 
+    |> Array.concat
+    |> Array.groupBy (fun (k, _) -> k)
+    |> Array.map (fun (k, v) -> k, v |> Array.map snd)
+    |> Map.ofArray
+    |> innerJoin table
+
+let rankMultipleUnified rankFns rankCombinerFn table =
+    rankMultiple rankFns table
+    |> Map.map (fun k (v,r) -> v, rankCombinerFn r)
+    |> Map.toArray
+    |> Array.sortBy (fun (_,(_,r)) -> r)

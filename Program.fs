@@ -43,10 +43,11 @@ let main argv =
         |> getMultipleFollowingsCached twitterCtx
         |> Map.toArray
         |> Array.sortByDescending (fun (_, a) -> a.FollowersFromQuery)
-        |> Array.truncate 250 
+        // |> Array.truncate 250 
         |> Map.ofArray 
 
     printfn "%A" (twitterResults.Keys.ToArray())
+    printfn "Twitter hits : %A" (twitterResults.Keys.Count)
 
     let followerWonkResults =
         twitterResults.Keys.ToArray()
@@ -56,25 +57,27 @@ let main argv =
         twitterResults
         |> innerJoin followerWonkResults
         |> Map.map (fun _ (fw,u) -> { u with SocialAuthority = fw.SocialAuthority })
-        |> Map.toArray
-        |> Array.map 
-            (fun (k,v) -> 
-                {| Username = v.Username
-                ; DisplayName = v.DisplayName
-                ; FollowersFromQuery = v.FollowersFromQuery
-                ; FollowerCount = v.FollowerCount
-                ; FollowingCount = v.FollowingCount
-                ; SocialAuthority = v.SocialAuthority
-                ; Influence = v.SocialAuthority * (decimal v.FollowersFromQuery) / (decimal v.FollowerCount)
-                |})
-        |> Array.sortByDescending (fun u -> u.Influence)
+        |> rankMultipleUnified 
+            [|(fun u -> u.SocialAuthority), Descending
+            ; (fun u -> decimal u.FollowersFromQuery), Descending
+            ; (fun u -> decimal u.FollowerCount), Ascending
+            ; (fun u -> decimal u.FollowingCount), Ascending
+            |]
+            //(fun ranks -> ranks |> Array.fold (+) 1 )
+            (fun ranks -> 
+                ranks 
+                |> Array.map (fun r -> r * r) 
+                |> Array.sum 
+                |> Math.Sqrt
+                )
+        //|> Map.toArray
 
     serializeJsonFileTimestamped 
         "data/results" 
         joinedResults
     
     joinedResults
-    |> Array.map (fun u -> u.Username, u.FollowersFromQuery, u.SocialAuthority,  u.Influence)
+    |> Array.map (fun (k, (u, r)) -> u.Username, u.SocialAuthority, u.FollowersFromQuery, u.FollowerCount, u.FollowingCount ,r)
     |> printfn "%A" 
     
     1

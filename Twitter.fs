@@ -144,9 +144,9 @@ let getMultipleFollowingsCached (twitterCtx:TwitterContext) initialAccountUserna
     |> Array.groupBy (fun u -> u.Id)
     |> Array.map 
         (fun (g,a) -> 
-            g, 
+            g.ToLowerInvariant(), 
             { UserId = a.[0].Id
-            ; Username = a.[0].Username
+            ; Username = a.[0].Username.ToLowerInvariant()
             ; DisplayName = a.[0].DisplayName
             ; Bio = a.[0].Bio
             ; FollowerCount = a.[0].FollowerCount
