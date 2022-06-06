@@ -14,6 +14,7 @@ open Twitter
 open TargetUsers
 open System.Linq
 open ExtraMap
+open Types
 
 open System
 open JsonFileProcessing
@@ -28,9 +29,11 @@ let setupDirectories =
     Directory.CreateDirectory("data") |> ignore
 
 
+let printUserId (userId:UserId) = 
+    printfn "Username: %A" userId
+
 [<EntryPoint>]
 let main argv =
-    (* *)
     let mutable auth = new SingleUserAuthorizer()
     auth.CredentialStore <- twitterCredentialStore
     let twitterCtx = new TwitterContext(auth)
@@ -39,11 +42,12 @@ let main argv =
     globalSocialAuthCache <- deserializeJsonFile "data/globalSocialAuthCache.json" 
 
     let twitterResults = 
-        TargetUsers.targetUsers
-        |> getMultipleFollowingsCached twitterCtx
+        TargetUsers.ecommerceUsers
+        |> Array.take 2
+        |> getMultipleFollowingsCached twitterCtx twitterBearerToken
         |> Map.toArray
         |> Array.sortByDescending (fun (_, a) -> a.FollowersFromQuery)
-        // |> Array.truncate 250 
+        |> Array.truncate 250 
         |> Map.ofArray 
 
     printfn "%A" (twitterResults.Keys.ToArray())
@@ -59,18 +63,12 @@ let main argv =
         |> Map.map (fun _ (fw,u) -> { u with SocialAuthority = fw.SocialAuthority })
         |> rankMultipleUnified 
             [|(fun u -> u.SocialAuthority), Descending
-            ; (fun u -> decimal u.FollowersFromQuery), Descending
-            ; (fun u -> decimal u.FollowerCount), Ascending
-            ; (fun u -> decimal u.FollowingCount), Ascending
-            |]
-            //(fun ranks -> ranks |> Array.fold (+) 1 )
-            (fun ranks -> 
-                ranks 
-                |> Array.map (fun r -> r * r) 
-                |> Array.sum 
-                |> Math.Sqrt
-                )
-        //|> Map.toArray
+            ; (fun u -> (decimal u.FollowerCount) / (decimal u.FollowersFromQuery)), Ascending
+            //; (fun u -> decimal u.FollowerCount), Ascending
+            //; (fun u -> decimal u.FollowingCount), Ascending
+            |] 
+            // manhattanDistance
+            euclidianDistance
 
     serializeJsonFileTimestamped 
         "data/results" 

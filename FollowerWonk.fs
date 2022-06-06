@@ -2,7 +2,6 @@ module FollowerWonk
 
 open System
 open FSharp.Data
-open FSharp.Json
 
 open Credentials
 open Delay
@@ -32,89 +31,80 @@ let authString accessId secretKey unixTimeValidUntil =
     let message = String.Format("{0}\n{1}", accessId, unixTimeValidUntil)
     let base64Signature = hash_hmac secretKey message
     String.Format("AccessID={0};Timestamp={1};Signature={2}", accessId, unixTimeValidUntil, base64Signature) 
- 
+
+
+let urlString usernames =
+    let time = DateTime.UtcNow
+    let unixTime = DateTimeOffset(time).ToUnixTimeSeconds() + 500L 
+    let auth = 
+        authString 
+            followerWonkCredentialStore.accessID 
+            followerWonkCredentialStore.secretKey 
+            unixTime
+    let uri = "https://api.followerwonk.com/social-authority"
+    let usernamesString = usernames |> Seq.map (fun x -> string x) |> String.concat ","
+    printfn "Fetching : %A" usernamesString 
+    let url = String.Format("{0}?screen_name={1};{2}", uri, usernamesString, auth)
+    log url
+    url 
+
+
 let mutable globalSocialAuthCache = Map.empty
 
-let lower strings = 
-    strings |> Seq.map (fun (x: string) -> (x.ToLowerInvariant()))
 
 let findUsersNotInCache usernames =
-    let lowercaseUsernames = lower usernames
-    let cacheMisses = globalSocialAuthCache |> findKeysNotInMap lowercaseUsernames
-
-    let cacheHits = 
-        cacheMisses 
-        |> Set.ofSeq
-        |> Set.difference (lowercaseUsernames |> Set.ofSeq)
-
-    cacheHits 
-    |> String.concat ","
-    |> printfn "Cache hits for '%A' " 
-
-    cacheMisses
+    globalSocialAuthCache |> partitionedFind usernames
 
 
 let getSocialAuth usernames =
-    let lowercaseUsernames = lower usernames
-
     let mutable lastTimeCalled = None 
-    let getSocialAuth usernames =
+    let getSocialAuth usernamesNotInCache =
         let delayPeriod = 200;
         lastTimeCalled <- delay delayPeriod lastTimeCalled
 
-        let time = DateTime.UtcNow
-        let unixTime = DateTimeOffset(time).ToUnixTimeSeconds() + 500L 
-        let auth = 
-            authString 
-                followerWonkCredentialStore.accessID 
-                followerWonkCredentialStore.secretKey 
-                unixTime
-        let uri = "https://api.followerwonk.com/social-authority"
-        let usernamesString = usernames |> String.concat ","
-        printfn "Fetching : %A" usernamesString 
-        let url = String.Format("{0}?screen_name={1};{2}", uri, usernamesString, auth)
-        log url
-
         let httpResult = 
             try
-                let result = (Http.RequestString(url))
+                let result = (Http.RequestString(urlString usernames))
                 "Success : " + result |> log
                 Ok result
             with
             | ex ->
                 printfn "%A" ex.Message 
+                "Failure : " + ex.Message |> log
                 Error ex.Message
 
         match httpResult with
             | Ok result ->
                 use stringReader = new StringReader(result) 
                 let root = FollowerWonkData.Load(stringReader)
+
                 let results = 
                     root.Embedded 
                     |> Array.map (
                         fun u -> 
-                            u.ScreenName.ToLowerInvariant(), 
+                            createUsername u.ScreenName, 
                             {
-                                Id = u.UserId.ToString()
-                                Username = u.ScreenName.ToLowerInvariant()
+                                Id = int64ToUserId u.UserId
+                                Username = createUsername u.ScreenName
                                 SocialAuthority = u.SocialAuthority
-                            })
+                            })     
 
-                globalSocialAuthCache <- globalSocialAuthCache |> addMultiple results
-                globalSocialAuthCache |> serializeJsonFile "data/globalSocialAuthCache.json" 
-                
-                
-                //globalSocialAuthCache |> Map.filter (fun key _ -> usernames |> Array.contains key)
+                results
 
-            | _ -> 
-                () // Map.empty
+            | ex -> 
+                Array.empty
 
-    lowercaseUsernames 
-    |> findUsersNotInCache
-    // |> Seq.take 25 // safety line for hardening the interaction with the API
-    |> Seq.chunkBySize 25 
-    |> Seq.map getSocialAuth 
-    |> ignore
 
-    globalSocialAuthCache 
-    |> Map.filter (fun key _ -> lowercaseUsernames |> Seq.contains key)
+    let _, unfound = 
+        usernames |> findUsersNotInCache
+
+    let fetchedResults =
+        unfound
+        // |> Seq.take 25 // safety line for hardening the interaction with the API
+        |> Seq.chunkBySize 25 
+        |> Seq.map getSocialAuth 
+        |> Seq.concat
+
+    globalSocialAuthCache <- globalSocialAuthCache |> addMultiple fetchedResults
+    globalSocialAuthCache |> serializeJsonFile "data/globalSocialAuthCache.json" 
+    globalSocialAuthCache |> Map.filter (fun k v -> usernames |> Seq.contains k)

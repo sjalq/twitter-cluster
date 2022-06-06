@@ -1,5 +1,7 @@
 module ExtraMap
 
+open System
+
 let fullOuterJoin left right =
     let leftKeys = left |> Map.keys
     let rightKeys = right |> Map.keys
@@ -77,3 +79,22 @@ let rankMultipleUnified rankFns rankCombinerFn table =
     |> Map.map (fun k (v,r) -> v, rankCombinerFn r)
     |> Map.toArray
     |> Array.sortBy (fun (_,(_,r)) -> r)
+
+let euclidianDistance v =
+    v
+    |> Array.map (fun x -> x * x)
+    |> Array.sum
+    |> float
+
+let manhattanDistance v  =
+    v |> Array.fold (+) 0 |> float
+
+let partitionedFind keys map =
+    keys 
+    |> Array.partition (fun key -> map |> Map.containsKey key)
+    |> (fun (found, unfound) -> 
+        (found 
+            |> Array.map (fun key -> (key, map |> Map.find key) ) 
+            |> Map.ofArray,
+        unfound)
+    )
