@@ -5,6 +5,7 @@
     <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="UnionConversions.fs" />
     <Compile Include="ExtraMap.fs" />
     <Compile Include="JsonFileProcessing.fs" />
     <Compile Include="Types.fs" />

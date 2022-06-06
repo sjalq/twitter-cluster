@@ -1,8 +1,6 @@
 module Twitter
 
 open System
-open LinqToTwitter
-open System.Linq
 
 open LinqToTwitter.Common
 
@@ -17,24 +15,78 @@ open System.Net
 open System.Net.Http
 
 [<Literal>]
-let twitterSample = "./twitterSample.json"
-type TwitterData = JsonProvider<twitterSample>
+let twitterFollowingSample = "./twitterFollowingSample.json"
+type TwitterFollowingData = JsonProvider<twitterFollowingSample>
+
+[<Literal>]
+let twitterAccountSample = "./twitterAccountSample.json"
+type TwitterAccountData = JsonProvider<twitterAccountSample>
 
 
-let getAccounts (twitterCtx:TwitterContext) usernames = 
-    let getAccounts usernames =
-        let usernamesString = usernames |> String.concat ","
-        let userQuery = 
-            twitterCtx.TwitterUser
-                .Where(fun user -> 
-                    user.Type = UserType.UsernameLookup
-                    && user.Usernames = usernamesString 
-                    && user.UserFields = UserField.AllFields)
-        userQuery.SingleOrDefault().Users.ToArray()
+// let getAccounts (twitterCtx:TwitterContext) usernames = 
+//     let getAccounts usernames =
+//         let usernamesString = usernames |> String.concat ","
+//         let userQuery = 
+//             twitterCtx.TwitterUser
+//                 .Where(fun user -> 
+//                     user.Type = UserType.UsernameLookup
+//                     && user.Usernames = usernamesString 
+//                     && user.UserFields = UserField.AllFields)
+//         userQuery.SingleOrDefault().Users.ToArray()
 
+//     usernames 
+//     |> Array.chunkBySize 20
+//     |> Array.Parallel.map getAccounts
+//     |> Array.fold (fun acc i -> acc |> Array.append i) [||]
+
+let rawQueryAccounts bearerToken usernames =
+    let api = "https://api.twitter.com/"
+    let userFieldsQuery = "&user.fields=" + UserField.AllFields
+    let userNamesQuery = "usernames=" + (usernames |> String.concat ",")
+    let queryString = String.Format("{0}2/users/by?{1}", api, userNamesQuery, userFieldsQuery)
+
+    printfn "%A" queryString
+
+    try 
+        let httpRequest = WebRequest.Create(queryString) :?> HttpWebRequest
+        httpRequest.Accept <- "application/json"
+        httpRequest.Headers.["Authorization"] <- "Bearer " + bearerToken
+        let httpResponse = httpRequest.GetResponse()
+
+        use streamReader = new StreamReader(httpResponse.GetResponseStream())
+        streamReader.ReadToEnd() |> Ok
+    with
+        | ex -> 
+            printfn "Exception: %A" ex.Message
+            Error ex.Message
+
+
+let decodeAccounts jsonString = 
+    try 
+        use stringReader = new StringReader(jsonString) 
+        let root = TwitterAccountData.Load(stringReader)
+        root.Data
+        |> Array.map (fun d -> 
+            {|
+                Id = int64ToUserId d.Id
+                Username = createUsername d.Username
+                DisplayName = d.Name
+            |})
+    with
+    | ex -> 
+        printfn "Exception: %A" ex.Message
+        [||]
+
+
+let getAccounts bearerToken usernames = 
     usernames 
     |> Array.chunkBySize 20
-    |> Array.Parallel.map getAccounts
+    |> Array.map (rawQueryAccounts bearerToken)
+    |> Array.filter (fun x -> match x with | Ok _ -> true | _ -> false )
+    |> Array.map (fun r -> 
+        match r with 
+        | Ok response -> decodeAccounts response 
+        | _ -> [||])
     |> Array.fold (fun acc i -> acc |> Array.append i) [||]
 
 
@@ -48,7 +100,7 @@ let rawQueryAccountFollowingRateLimited bearerToken paginationToken userId =
         | None -> ""
     let api = "https://api.twitter.com/"
     let userFieldsQuery = "&user.fields=" + UserField.AllFields
-    let userIdQuery = userIdToString userId
+    let userIdQuery = userId
     let queryString = String.Format("{0}2/users/{1}/following?max_results=1000{2}{3}", api, userIdQuery, paginationQuery, userFieldsQuery)
 
     printfn "%A" queryString
@@ -70,11 +122,10 @@ let rawQueryAccountFollowingRateLimited bearerToken paginationToken userId =
 let decodeUsers jsonString = 
     try 
         use stringReader = new StringReader(jsonString) 
-        let root = TwitterData.Load(stringReader)
+        let root = TwitterFollowingData.Load(stringReader)
         root.Data
         |> Array.map (fun d -> 
-            createUsername d.Username, 
-                {
+            {
                 Id = int64ToUserId d.Id
                 Username = createUsername d.Username
                 DisplayName = 
@@ -93,7 +144,7 @@ let decodeUsers jsonString =
 let decodePaginationToken jsonString = 
     try 
         use stringReader = new StringReader(jsonString) 
-        let root = TwitterData.Load(stringReader)
+        let root = TwitterFollowingData.Load(stringReader)
         let nextToken = root.Meta.NextToken
         if nextToken = null then
             None
@@ -145,19 +196,18 @@ let getAccountFollowingCached bearerToken paginationToken userId =
         following
 
 
-let getMultipleFollowingsCached (twitterCtx:TwitterContext) bearerToken initialAccountUsernames =
+let getMultipleFollowingsCached bearerToken initialAccountUsernames =
     initialAccountUsernames 
     |> Array.distinct
-    |> getAccounts twitterCtx 
-    |> Array.map (fun a -> getAccountFollowingCached bearerToken None (stringToUserId a.ID))
+    |> getAccounts bearerToken 
+    |> Array.map (fun a -> getAccountFollowingCached bearerToken None a.Id)
     |> Array.concat
-    |> Array.map (fun (_,t) -> t)
-    |> Array.groupBy (fun t -> t.Id)
+    |> Array.groupBy (fun t -> createUsername t.Username)
     |> Array.map 
         (fun (g,a) -> 
             g, 
             { Id = a.[0].Id
-            ; Username = a.[0].Username
+            ; Username = createUsername a.[0].Username
             ; DisplayName = a.[0].DisplayName
             ; Bio = a.[0].Bio
             ; FollowerCount = a.[0].FollowerCount

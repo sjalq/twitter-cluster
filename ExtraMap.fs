@@ -82,9 +82,9 @@ let rankMultipleUnified rankFns rankCombinerFn table =
 
 let euclidianDistance v =
     v
-    |> Array.map (fun x -> x * x)
-    |> Array.sum
-    |> float
+    |> Array.map (fun x -> (float x) * (float x))
+    |> Array.fold (+) 0.0
+    |> Math.Sqrt
 
 let manhattanDistance v  =
     v |> Array.fold (+) 0 |> float

@@ -49,6 +49,44 @@ let urlString usernames =
     url 
 
 
+let mutable lastTimeCalled = None 
+let getSocialAuthRateLimited usernamesNotInCache =
+    let delayPeriod = 1000;
+    lastTimeCalled <- delay delayPeriod lastTimeCalled
+
+    let httpResult = 
+        try
+            let result = (Http.RequestString(urlString usernamesNotInCache))
+            "Success : " + result |> log
+            Ok result
+        with
+        | ex ->
+            printfn "%A" ex.Message 
+            "Failure : " + ex.Message |> log
+            Error ex.Message
+
+    match httpResult with
+        | Ok result ->
+            use stringReader = new StringReader(result) 
+            let root = FollowerWonkData.Load(stringReader)
+
+            let results = 
+                root.Embedded 
+                |> Array.map (
+                    fun u -> 
+                        createUsername u.ScreenName, 
+                        {
+                            Id = int64ToUserId u.UserId
+                            Username = createUsername u.ScreenName
+                            SocialAuthority = u.SocialAuthority
+                        })     
+
+            results
+
+        | ex -> 
+            Array.empty
+
+
 let mutable globalSocialAuthCache = Map.empty
 
 
@@ -56,55 +94,21 @@ let findUsersNotInCache usernames =
     globalSocialAuthCache |> partitionedFind usernames
 
 
-let getSocialAuth usernames =
-    let mutable lastTimeCalled = None 
-    let getSocialAuth usernamesNotInCache =
-        let delayPeriod = 200;
-        lastTimeCalled <- delay delayPeriod lastTimeCalled
-
-        let httpResult = 
-            try
-                let result = (Http.RequestString(urlString usernames))
-                "Success : " + result |> log
-                Ok result
-            with
-            | ex ->
-                printfn "%A" ex.Message 
-                "Failure : " + ex.Message |> log
-                Error ex.Message
-
-        match httpResult with
-            | Ok result ->
-                use stringReader = new StringReader(result) 
-                let root = FollowerWonkData.Load(stringReader)
-
-                let results = 
-                    root.Embedded 
-                    |> Array.map (
-                        fun u -> 
-                            createUsername u.ScreenName, 
-                            {
-                                Id = int64ToUserId u.UserId
-                                Username = createUsername u.ScreenName
-                                SocialAuthority = u.SocialAuthority
-                            })     
-
-                results
-
-            | ex -> 
-                Array.empty
-
-
-    let _, unfound = 
-        usernames |> findUsersNotInCache
+let getSocialAuthCached usernames =
+    let usernames = usernames |> Array.map createUsername
+    let _, unfound = usernames |> findUsersNotInCache
 
     let fetchedResults =
         unfound
-        // |> Seq.take 25 // safety line for hardening the interaction with the API
+        |> Seq.truncate 250
         |> Seq.chunkBySize 25 
-        |> Seq.map getSocialAuth 
+        |> Seq.map getSocialAuthRateLimited 
         |> Seq.concat
 
     globalSocialAuthCache <- globalSocialAuthCache |> addMultiple fetchedResults
     globalSocialAuthCache |> serializeJsonFile "data/globalSocialAuthCache.json" 
-    globalSocialAuthCache |> Map.filter (fun k v -> usernames |> Seq.contains k)
+    let results = 
+        globalSocialAuthCache 
+        |> Map.filter (fun k _ -> usernames |> Seq.contains (createUsername k))
+    printfn "Found : %A" globalSocialAuthCache.Count
+    results
