@@ -1,4 +1,11 @@
 {
     "FSharp.inlayHints.typeAnnotations": false,
-    "FSharp.inlayHints.parameterNames": false
+    "FSharp.inlayHints.parameterNames": false,
+    "FSharp.excludeProjectDirectories": [
+        ".git",
+        "paket-files",
+        ".fable",
+        "packages",
+        "node_modules"
+    ]
 }
