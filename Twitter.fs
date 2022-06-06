@@ -23,22 +23,6 @@ let twitterAccountSample = "./twitterAccountSample.json"
 type TwitterAccountData = JsonProvider<twitterAccountSample>
 
 
-// let getAccounts (twitterCtx:TwitterContext) usernames = 
-//     let getAccounts usernames =
-//         let usernamesString = usernames |> String.concat ","
-//         let userQuery = 
-//             twitterCtx.TwitterUser
-//                 .Where(fun user -> 
-//                     user.Type = UserType.UsernameLookup
-//                     && user.Usernames = usernamesString 
-//                     && user.UserFields = UserField.AllFields)
-//         userQuery.SingleOrDefault().Users.ToArray()
-
-//     usernames 
-//     |> Array.chunkBySize 20
-//     |> Array.Parallel.map getAccounts
-//     |> Array.fold (fun acc i -> acc |> Array.append i) [||]
-
 let rawQueryAccounts bearerToken usernames =
     let api = "https://api.twitter.com/"
     let userFieldsQuery = "&user.fields=" + UserField.AllFields
