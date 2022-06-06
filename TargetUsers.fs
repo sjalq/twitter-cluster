@@ -1,8 +1,8 @@
 module TargetUsers
 
 let targetUsers = 
-    [| "elonmusk"
-    ; "schalkdormehl"
+    [| "schalkdormehl"
+    ; "elonmusk"
     ; "vitalikbuterin"
     ; "zooko"
     ; "ErikVoorhees"
