@@ -1,8 +1,9 @@
 module Types
+open System
 
 let createUsername (username:string) = username.ToLowerInvariant()
 
-let int64ToUserId (userId:int64) = userId.ToString() 
+let int64ToUserId (userId:int64) = userId.ToString().Trim() 
 
 type TwitterUser =
     {
@@ -31,4 +32,8 @@ type UserResult =
         FollowingCount : int
         FollowersFromQuery : int
         SocialAuthority : decimal
+        CombinedRank : float
     }
+
+let nowString () = 
+    DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss")

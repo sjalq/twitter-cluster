@@ -5,3 +5,4 @@ log/*
 Credentials.fs
 .fake
 .DS_Store
+ethereum nft.csv

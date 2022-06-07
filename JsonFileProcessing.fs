@@ -4,8 +4,7 @@ open System
 open System.IO
 open FSharp.Json
 
-let nowString () = 
-    DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss")
+open Types
 
 let deserializeJsonFile filename = 
     let jsonString = 
@@ -29,9 +28,9 @@ let serializeJsonFile filename data =
 
 let serializeJsonFileTimestamped filename data =
     serializeJsonFile 
-        (String.Format("{0} {1}.json", filename, nowString () ))
+        (String.Format("{0} {1}.json", filename, nowString() ))
         data
 
 
 let log data = 
-    File.AppendAllLines("data/log.txt", [nowString (); data])
+    File.AppendAllLines("data/log.txt", [nowString(); data])

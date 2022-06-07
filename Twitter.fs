@@ -119,7 +119,7 @@ let decodePaginationToken jsonString =
         use stringReader = new StringReader(jsonString) 
         let root = TwitterFollowingData.Load(stringReader)
         let nextToken = root.Meta.NextToken
-        if nextToken = null then
+        if nextToken = null || nextToken = "" then
             None
         else
             Some nextToken
@@ -187,6 +187,7 @@ let getMultipleFollowingsCached bearerToken initialAccountUsernames =
             ; FollowingCount = a.[0].FollowingCount
             ; FollowersFromQuery = a.Length
             ; SocialAuthority = 0M
+            ; CombinedRank = 0
             })
 
     // next line replaces the userid with the username as key for ease of use later.
@@ -194,7 +195,8 @@ let getMultipleFollowingsCached bearerToken initialAccountUsernames =
     |> Map.ofArray
 
 // TODO :
-// * Output reusts as .csv
+// * Output result as .csv
+// * Use a .csv input
 // * Make .sh and .bat files to set authentication tokens globally
 // * Add params for input files and output files
 // * Use mongoDB online to store the cache

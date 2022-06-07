@@ -5,9 +5,10 @@
     <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Types.fs" />
+    <Compile Include="CsvFileProcessing.fs" />
     <Compile Include="ExtraMap.fs" />
     <Compile Include="JsonFileProcessing.fs" />
-    <Compile Include="Types.fs" />
     <Compile Include="Delay.fs" />
     <Compile Include="Credentials.fs" />
     <Compile Include="Twitter.fs" />

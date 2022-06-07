@@ -1,4 +1,5 @@
 ﻿open FSharp.Core
+open FSharp.Data
 open System
 open System.IO
 open System.Linq
@@ -9,23 +10,28 @@ open FollowerWonk
 open JsonFileProcessing
 open Twitter
 open Types
-
-
-let writeResults results = 
-    let filename = String.Format("data/query {0}.json", nowString ())
-    results |> serializeJsonFile filename
+open CsvFileProcessing
 
 
 let setupDirectories =
     Directory.CreateDirectory("data") |> ignore
 
+
 [<EntryPoint>]
 let main argv =
+    let inputCsvFile = argv[0]
+    let usernamesToQuery = 
+        match getUsernamesFromCsv inputCsvFile with
+        | Ok usernames -> usernames
+        | Error msg -> 
+            printfn "Error : %A" msg
+            [||]
+
     globalUserCache <- deserializeJsonFile "data/globalUserCache.json"
     globalSocialAuthCache <- deserializeJsonFile "data/globalSocialAuthCache.json" 
 
     let twitterResults = 
-        TargetUsers.ecommerceUsers
+        usernamesToQuery
         |> getMultipleFollowingsCached twitterBearerToken
 
     printfn "%A" (twitterResults.Keys.ToArray())
@@ -55,13 +61,17 @@ let main argv =
             |] 
             manhattanDistance
             // euclidianDistance
+        |> Array.map (fun (_, (ur, rank)) -> { ur with CombinedRank = rank })
+
+    writeResultToTimestampedCsv
+        "data/results"
+        joinedResults
 
     serializeJsonFileTimestamped 
         "data/results" 
         joinedResults
     
     joinedResults
-    |> Array.map (fun (k, (u, r)) -> u.Username, u.SocialAuthority, u.FollowersFromQuery, u.FollowerCount, u.FollowingCount ,r)
     |> printfn "%A" 
     
     1
