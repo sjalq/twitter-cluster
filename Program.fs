@@ -1,14 +1,14 @@
-﻿open System
+﻿open FSharp.Core
+open System
 open System.IO
-open FSharp.Core
+open System.Linq
 
 open Credentials
-open FollowerWonk
-open Twitter
-open System.Linq
 open ExtraMap
-open Types
+open FollowerWonk
 open JsonFileProcessing
+open Twitter
+open Types
 
 
 let writeResults results = 
@@ -18,7 +18,6 @@ let writeResults results =
 
 let setupDirectories =
     Directory.CreateDirectory("data") |> ignore
-
 
 [<EntryPoint>]
 let main argv =

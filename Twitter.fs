@@ -1,18 +1,19 @@
 module Twitter
 
-open System
-
-open LinqToTwitter.Common
-
-open System.IO
-open FSharp.Data
 open FSharp.Core
-
-open Delay
-open Types
-open JsonFileProcessing
+open FSharp.Data
+open System
+open System.IO
 open System.Net
 open System.Net.Http
+
+open Delay
+open JsonFileProcessing
+open Types
+
+
+[<Literal>]
+let AllFields = "created_at,description,entities,id,location,name,pinned_tweet_id,profile_image_url,protected,public_metrics,url,username,verified,withheld";
 
 [<Literal>]
 let twitterFollowingSample = "./twitterFollowingSample.json"
@@ -22,15 +23,9 @@ type TwitterFollowingData = JsonProvider<twitterFollowingSample>
 let twitterAccountSample = "./twitterAccountSample.json"
 type TwitterAccountData = JsonProvider<twitterAccountSample>
 
-
-let rawQueryAccounts bearerToken usernames =
-    let api = "https://api.twitter.com/"
-    let userFieldsQuery = "&user.fields=" + UserField.AllFields
-    let userNamesQuery = "usernames=" + (usernames |> String.concat ",")
-    let queryString = String.Format("{0}2/users/by?{1}", api, userNamesQuery, userFieldsQuery)
-
-    printfn "%A" queryString
-
+let baseApi = "https://api.twitter.com/"
+let queryTwitter bearerToken queryString =
+    printfn "%s" queryString
     try 
         let httpRequest = WebRequest.Create(queryString) :?> HttpWebRequest
         httpRequest.Accept <- "application/json"
@@ -43,6 +38,14 @@ let rawQueryAccounts bearerToken usernames =
         | ex -> 
             printfn "Exception: %A" ex.Message
             Error ex.Message
+
+
+let rawQueryAccounts bearerToken usernames =
+    let userFieldsQuery = "&user.fields=" + AllFields
+    let userNamesQuery = "usernames=" + (usernames |> String.concat ",")
+    let queryString = String.Format("{0}2/users/by?{1}", baseApi, userNamesQuery, userFieldsQuery)
+
+    queryTwitter bearerToken queryString
 
 
 let decodeAccounts jsonString = 
@@ -82,25 +85,11 @@ let rawQueryAccountFollowingRateLimited bearerToken paginationToken userId =
         match paginationToken with
         | Some pt -> "&pagination_token=" + pt
         | None -> ""
-    let api = "https://api.twitter.com/"
-    let userFieldsQuery = "&user.fields=" + UserField.AllFields
+    let userFieldsQuery = "&user.fields=" + AllFields
     let userIdQuery = userId
-    let queryString = String.Format("{0}2/users/{1}/following?max_results=1000{2}{3}", api, userIdQuery, paginationQuery, userFieldsQuery)
+    let queryString = String.Format("{0}2/users/{1}/following?max_results=1000{2}{3}", baseApi, userIdQuery, paginationQuery, userFieldsQuery)
 
-    printfn "%A" queryString
-
-    try 
-        let httpRequest = WebRequest.Create(queryString) :?> HttpWebRequest
-        httpRequest.Accept <- "application/json"
-        httpRequest.Headers.["Authorization"] <- "Bearer " + bearerToken
-        let httpResponse = httpRequest.GetResponse()
-
-        use streamReader = new StreamReader(httpResponse.GetResponseStream())
-        streamReader.ReadToEnd() |> Ok
-    with
-        | ex -> 
-            printfn "Exception: %A" ex.Message
-            Error ex.Message
+    queryTwitter bearerToken queryString
 
 
 let decodeUsers jsonString = 
@@ -200,6 +189,16 @@ let getMultipleFollowingsCached bearerToken initialAccountUsernames =
             ; SocialAuthority = 0M
             })
 
-    // next line replaces the userid with the username for ease of use later.
+    // next line replaces the userid with the username as key for ease of use later.
     |> Array.map (fun (_, record) -> record.Username, record) 
     |> Map.ofArray
+
+// TODO :
+// * Output reusts as .csv
+// * Make .sh and .bat files to set authentication tokens globally
+// * Add params for input files and output files
+// * Use mongoDB online to store the cache
+// * Add API end points
+// * Deploy this to a and an API endpoint
+// * Add swagger definitions
+// * Add background services to slowly milk both Twitter and FollowerWonk for additional enrichment data
