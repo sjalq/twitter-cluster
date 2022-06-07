@@ -1,4 +1,5 @@
 module Types
+
 open System
 
 let createUsername (username:string) = username.ToLowerInvariant()

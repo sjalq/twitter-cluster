@@ -34,9 +34,6 @@ let main argv =
         usernamesToQuery
         |> getMultipleFollowingsCached twitterBearerToken
 
-    printfn "%A" (twitterResults.Keys.ToArray())
-    printfn "Twitter hits : %A" (twitterResults.Keys.Count)
-
     let followerWonkResults =
         twitterResults
         |> Map.toArray
@@ -54,10 +51,11 @@ let main argv =
             })
         |> Map.filter (fun _ u -> u.SocialAuthority > 0M)
         |> rankMultipleUnified 
-            [|(fun u -> u.SocialAuthority), Descending
-            //; (fun u -> (decimal u.FollowerCount) / (decimal u.FollowersFromQuery)), Ascending
-            ; (fun u -> decimal u.FollowersFromQuery), Descending
-            ; (fun u -> decimal u.FollowerCount), Ascending
+            [|
+              (fun u -> u.SocialAuthority), Descending
+              (fun u -> (decimal u.FollowerCount) / (decimal u.FollowersFromQuery)), Ascending
+              //(fun u -> decimal u.FollowersFromQuery), Descending
+              //(fun u -> decimal u.FollowerCount), Ascending
             |] 
             manhattanDistance
             // euclidianDistance
