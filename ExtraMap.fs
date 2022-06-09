@@ -98,3 +98,17 @@ let partitionedFind keys map =
             |> Map.ofArray,
         unfound)
     )
+
+let isOk result =
+    match result with
+    | Ok _ -> true
+    | _ -> false
+
+let getValue result = 
+    match result with 
+    | Ok v -> v
+
+let getError result =
+    match result with
+    | Error e -> e
+    
