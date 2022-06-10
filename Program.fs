@@ -20,12 +20,19 @@ let setupDirectories =
 [<EntryPoint>]
 let main argv =
     let inputCsvFile = argv[0]
+    let queryCount = 
+        try 
+            Int32.Parse argv[1]
+        with
+        | ex -> 120
+
     let usernamesToQuery = 
         match getUsernamesFromCsv inputCsvFile with
         | Ok usernames -> usernames
         | Error msg -> 
             printfn "Error : %A" msg
             [||]
+        |> Array.truncate queryCount
 
     globalUserCache <- deserializeJsonFile "data/globalUserCache.json"
     globalSocialAuthCache <- deserializeJsonFile "data/globalSocialAuthCache.json" 

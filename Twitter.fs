@@ -193,14 +193,3 @@ let getMultipleFollowingsCached bearerToken initialAccountUsernames =
     // next line replaces the userid with the username as key for ease of use later.
     |> Array.map (fun (_, record) -> record.Username, record) 
     |> Map.ofArray
-
-// TODO :
-// * Output result as .csv
-// * Use a .csv input
-// * Make .sh and .bat files to set authentication tokens globally
-// * Add params for input files and output files
-// * Use mongoDB online to store the cache
-// * Add API end points
-// * Deploy this to a and an API endpoint
-// * Add swagger definitions
-// * Add background services to slowly milk both Twitter and FollowerWonk for additional enrichment data
