@@ -42,6 +42,8 @@ let findKeysNotInMap keys table =
     keys |> Seq.filter (fun key -> table |> Map.containsKey key |> not)
 
 let addMultiple kvp table =
+    //table |> Map.toSeq |> Seq.append kvp |> Map.ofSeq
+
     kvp 
     |> Seq.fold 
         (fun state (key, value) -> state |> Map.add key value) 

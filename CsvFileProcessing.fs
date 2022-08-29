@@ -9,11 +9,13 @@ open Types
 
 type InputCsv = CsvProvider<"inputSample.csv", HasHeaders=true>
 
-let getUsernamesFromCsv (filename:string) =
+let getUsernamesFromCsv (filename:string) queryCount (maxFollowingCount:int) =
     try
         let csvText = File.ReadAllText(filename)
-        let csv = InputCsv.Parse(csvText).Rows |> Seq.take 100
-        csv 
+        
+        InputCsv.Parse(csvText).Rows
+        |> Seq.filter (fun x -> x.Friends < (decimal maxFollowingCount))
+        |> Seq.truncate queryCount
         |> Seq.map (fun r -> r.``Screen name`` |> createUsername)
         |> Seq.toArray
         |> Ok

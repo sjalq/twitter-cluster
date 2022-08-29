@@ -19,27 +19,50 @@ let setupDirectories =
 
 [<EntryPoint>]
 let main argv =
-    let inputCsvFile = argv[0]
+    let inputCsvFile = 
+        argv[0]
+
     let queryCount = 
         try 
             Int32.Parse argv[1]
         with
-        | ex -> 120
+        | ex -> 20
+
+    let maxFollowingCount = 
+        try 
+            Int32.Parse argv[2]
+        with
+        | ex -> 10000
+
+    let thresholdFollowingFromQueryPercentage = 
+        try 
+            Double.Parse argv[3]
+        with
+        | ex -> 0.05
+
+    printfn "Querying %A users from Twitter" queryCount
 
     let usernamesToQuery = 
-        match getUsernamesFromCsv inputCsvFile with
+        match getUsernamesFromCsv inputCsvFile queryCount maxFollowingCount with
         | Ok usernames -> usernames
         | Error msg -> 
             printfn "Error : %A" msg
             [||]
-        |> Array.truncate queryCount
 
     globalUserCache <- deserializeJsonFile "data/globalUserCache.json"
     globalSocialAuthCache <- deserializeJsonFile "data/globalSocialAuthCache.json" 
 
+    // let elonFollows = 
+    //     globalUserCache 
+    //     |> Map.find "44196397" 
+    //     |> Array.map (fun user -> user.Username)
+
+    // printfn "Elon follows %A accounts"  elonFollows.Length
+
     let twitterResults = 
         usernamesToQuery
         |> getMultipleFollowingsCached twitterBearerToken
+        |> Map.filter (fun k v -> (float v.FollowersFromQuery) / (float usernamesToQuery.Length) >  thresholdFollowingFromQueryPercentage)
 
     let followerWonkResults =
         twitterResults
@@ -56,13 +79,14 @@ let main argv =
                             |> Option.map (fun f -> f.SocialAuthority) 
                             |> Option.defaultValue 0M 
             })
-        |> Map.filter (fun _ u -> u.SocialAuthority > 0M)
+        // |> Map.filter (fun _ u -> u.SocialAuthority > 0M)
         |> rankMultipleUnified 
             [|
               (fun u -> u.SocialAuthority), Descending
-              (fun u -> (decimal u.FollowerCount) / (decimal u.FollowersFromQuery)), Ascending
-              //(fun u -> decimal u.FollowersFromQuery), Descending
-              //(fun u -> decimal u.FollowerCount), Ascending
+              //(fun u -> (decimal u.FollowerCount) / ((decimal u.FollowersFromQuery) * (decimal u.FollowersFromQuery))), Ascending
+              (fun u -> decimal u.FollowersFromQuery), Descending
+              (fun u -> decimal u.FollowerCount), Ascending
+              (fun u -> decimal u.FollowingCount), Ascending
             |] 
             manhattanDistance
             // euclidianDistance
@@ -77,6 +101,7 @@ let main argv =
         joinedResults
     
     joinedResults
-    |> printfn "%A" 
+    |> Array.length
+    |> printfn "%A results" 
     
     1

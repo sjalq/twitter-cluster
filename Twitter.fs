@@ -193,3 +193,6 @@ let getMultipleFollowingsCached bearerToken initialAccountUsernames =
     // next line replaces the userid with the username as key for ease of use later.
     |> Array.map (fun (_, record) -> record.Username, record) 
     |> Map.ofArray
+
+// let printAll set fn = 
+    
