@@ -62,7 +62,7 @@ let main argv =
     let twitterResults = 
         usernamesToQuery
         |> getMultipleFollowingsCached twitterBearerToken
-        |> Map.filter (fun k v -> (float v.FollowersFromQuery) / (float usernamesToQuery.Length) >  thresholdFollowingFromQueryPercentage)
+        |> Map.filter (fun k v -> (float v.FollowersFromQuery) / (float usernamesToQuery.Length) >=  thresholdFollowingFromQueryPercentage)
 
     let followerWonkResults =
         twitterResults
@@ -86,7 +86,8 @@ let main argv =
               //(fun u -> (decimal u.FollowerCount) / ((decimal u.FollowersFromQuery) * (decimal u.FollowersFromQuery))), Ascending
               (fun u -> decimal u.FollowersFromQuery), Descending
               (fun u -> decimal u.FollowerCount), Ascending
-              (fun u -> decimal u.FollowingCount), Ascending
+              //(fun u -> decimal u.FollowingCount), Ascending
+              //(fun u -> ((float u.FollowersFromQuery) ** 2)/(float u.FollowerCount)), Descending
             |] 
             manhattanDistance
             // euclidianDistance
